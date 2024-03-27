@@ -1,22 +1,13 @@
 package ext
 
-import com.fasterxml.jackson.annotation.JsonInclude
-import com.fasterxml.jackson.core.JsonParser
-import com.fasterxml.jackson.databind.DeserializationContext
-import com.fasterxml.jackson.databind.DeserializationFeature
-import com.fasterxml.jackson.databind.JsonDeserializer
-import com.fasterxml.jackson.databind.ObjectMapper
-import com.fasterxml.jackson.databind.module.SimpleModule
 import icu.samnyan.aqua.net.utils.ApiException
+import icu.samnyan.aqua.sega.general.BaseHandler
 import io.ktor.client.*
 import io.ktor.client.engine.cio.*
 import io.ktor.client.plugins.contentnegotiation.*
 import io.ktor.serialization.kotlinx.json.*
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import kotlinx.serialization.ExperimentalSerializationApi
-import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.JsonNamingStrategy
 import org.apache.tika.Tika
 import org.apache.tika.mime.MimeTypes
 import org.slf4j.LoggerFactory
@@ -77,51 +68,15 @@ operator fun Int.minus(message: String): Nothing {
     ApiException.log.info("> Error $this: $message")
     throw ApiException(this, message)
 }
+fun <R> parsing(block: () -> R) = try { block() }
+catch (e: ApiException) { throw e }
+catch (e: Exception) { 400 - e.message.toString() }
 
 // Email validation
 // https://www.baeldung.com/java-email-validation-regex
 val emailRegex = "^(?=.{1,64}@)[\\p{L}0-9_-]+(\\.[\\p{L}0-9_-]+)*@[^-][\\p{L}0-9-]+(\\.[\\p{L}0-9-]+)*(\\.[\\p{L}]{2,})$".toRegex()
 fun Str.isValidEmail(): Bool = emailRegex.matches(this)
 
-// JSON
-val ACCEPTABLE_FALSE = setOf("0", "false", "no", "off", "False", "None", "null")
-val ACCEPTABLE_TRUE = setOf("1", "true", "yes", "on", "True")
-val JSON_FUZZY_BOOLEAN = SimpleModule().addDeserializer(Boolean::class.java, object : JsonDeserializer<Boolean>() {
-    override fun deserialize(parser: JsonParser, context: DeserializationContext) = when(parser.text) {
-        in ACCEPTABLE_FALSE -> false
-        in ACCEPTABLE_TRUE -> true
-        else -> 400 - "Invalid boolean value ${parser.text}"
-    }
-})
-val JSON_DATETIME = SimpleModule().addDeserializer(LocalDateTime::class.java, object : JsonDeserializer<LocalDateTime>() {
-    override fun deserialize(parser: JsonParser, context: DeserializationContext) =
-        parser.text.asDateTime() ?: (400 - "Invalid date time value ${parser.text}")
-})
-val JACKSON = ObjectMapper().apply {
-    setSerializationInclusion(JsonInclude.Include.NON_NULL)
-    setDefaultPropertyInclusion(JsonInclude.Include.NON_NULL)
-    findAndRegisterModules()
-    registerModule(JSON_FUZZY_BOOLEAN)
-    registerModule(JSON_DATETIME)
-    configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false)
-}
-inline fun <reified T> ObjectMapper.readValue(str: Str) = readValue(str, T::class.java)
-// TODO: https://stackoverflow.com/q/78197784/7346633
-inline fun <reified T> Str.parseJackson() = if (contains("null")) {
-    val map = JACKSON.readValue<MutableMap<String, Any>>(this)
-    JACKSON.convertValue(map.recursiveNotNull(), T::class.java)
-}
-else JACKSON.readValue(this, T::class.java)
-fun <T> T.toJson() = JACKSON.writeValueAsString(this)
-@OptIn(ExperimentalSerializationApi::class)
-val JSON = Json {
-    ignoreUnknownKeys = true
-    isLenient = true
-    namingStrategy = JsonNamingStrategy.SnakeCase
-    explicitNulls = false
-    coerceInputValues = true
-}
-inline fun <reified T> Json.parse(str: Str) = decodeFromString<T>(str)
 // Global Tools
 val HTTP = HttpClient(CIO) {
     install(ContentNegotiation) {

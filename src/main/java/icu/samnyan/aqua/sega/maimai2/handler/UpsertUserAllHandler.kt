@@ -13,7 +13,6 @@ import icu.samnyan.aqua.sega.maimai2.model.request.UpsertUserAll
 import icu.samnyan.aqua.sega.maimai2.model.userdata.*
 import icu.samnyan.aqua.sega.util.jackson.BasicMapper
 import lombok.AllArgsConstructor
-import org.slf4j.Logger
 import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Component
 
@@ -27,7 +26,8 @@ class UpsertUserAllHandler(
     val cardService: CardService,
     val repos: Mai2Repos
 ) : BaseHandler {
-    val SUCCESS = """{"returnCode":1,"apiName":"com.sega.maimai2servlet.api.UpsertUserAllApi"}"""
+
+    fun String.isValidUsername() = isNotBlank() && length <= 8 && all { it in USERNAME_CHARS }
 
     @Throws(JsonProcessingException::class)
     override fun handle(request: Map<String, Any>): Any? {
@@ -47,9 +47,13 @@ class UpsertUserAllHandler(
             card = userData?.card ?: cardService.getCardByExtId(userId).orElseThrow()
             isNetMember = 1
 
-            // Verify user name
-            if (userName.isBlank() || userName.length > 8 || !userName.all { it in USERNAME_CHARS })
-                400 - "Invalid username"
+            // Validate username
+            if (!userName.isValidUsername())
+            {
+                // Maybe it's encoded
+                userName = String(userName.toByteArray(Charsets.ISO_8859_1), Charsets.UTF_8)
+                if (!userName.isValidUsername()) 400 - "Invalid username"
+            }
         })
 
         // Check playlog backlog
@@ -60,7 +64,7 @@ class UpsertUserAllHandler(
         // Set users
         req.run { listOf(userExtend, userOption, userCharacterList, userMapList, userLoginBonusList, userItemList,
             userMusicDetailList, userCourseList, userFriendSeasonRankingList, userFavoriteList) }
-            .flatten().forEach { it?.user = u }
+            .flatten().forEach { it.user = u }
 
         req.userExtend?.getOrNull(0)?.let {
             repos.userExtend.save(it.apply { id = repos.userExtend.findSingleByUser(u)()?.id ?: 0 })
@@ -134,6 +138,7 @@ class UpsertUserAllHandler(
     }
 
     companion object {
-        val logger: Logger = LoggerFactory.getLogger(UpsertUserAllHandler::class.java)
+        val logger = LoggerFactory.getLogger(UpsertUserAllHandler::class.java)
+        const val SUCCESS = """{"returnCode":1,"apiName":"com.sega.maimai2servlet.api.UpsertUserAllApi"}"""
     }
 }

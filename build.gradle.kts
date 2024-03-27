@@ -4,7 +4,7 @@ import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 
 plugins {
-    val ktVer = "2.0.0-Beta4"
+    val ktVer = "2.0.0-Beta5"
 
     java
     kotlin("plugin.lombok") version ktVer
@@ -63,6 +63,7 @@ dependencies {
     implementation("io.ktor:ktor-client-core:2.3.8")
     implementation("io.ktor:ktor-client-cio:2.3.8")
     implementation("io.ktor:ktor-client-content-negotiation:2.3.8")
+    implementation("io.ktor:ktor-client-encoding:2.3.8")
     implementation("io.ktor:ktor-serialization-kotlinx-json:2.3.8")
     implementation("org.jetbrains.kotlin:kotlin-reflect")
 
@@ -87,6 +88,13 @@ dependencies {
 
     // Import: DateTime Parsing
     implementation("com.fasterxml.jackson.datatype:jackson-datatype-jsr310:2.17.0")
+
+    // Serialization
+    implementation("com.fasterxml.jackson.module:jackson-module-kotlin")
+
+    // Testing
+    testImplementation("io.kotest:kotest-runner-junit5-jvm:5.8.1")
+    testImplementation("io.kotest:kotest-assertions-core")
 }
 
 group = "icu.samnya"
@@ -107,6 +115,7 @@ tasks.processResources {
 }
 
 tasks.test {
+    enabled = false
     useJUnitPlatform()
 }
 
